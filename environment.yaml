@@ -30,15 +30,20 @@ dependencies:
       - absl-py==2.1.0
       - cffi==1.17.1
       - click==8.1.8
+      - contourpy==1.3.1
+      - cycler==0.12.1
       - cyclonedds==0.10.2
       - cython==3.0.12
       - etils==1.12.2
       - fasteners==0.19
+      - fonttools==4.56.0
       - fsspec==2025.3.0
       - glfw==2.8.0
       - imageio==2.37.0
       - importlib-resources==6.5.2
+      - kiwisolver==1.4.8
       - markdown-it-py==3.0.0
+      - matplotlib==3.10.1
       - mdurl==0.1.2
       - mujoco==3.3.0
       - numpy==2.2.3
@@ -47,8 +52,12 @@ dependencies:
       - pycparser==2.22
       - pygame==2.6.1
       - pyopengl==3.1.9
+      - pyparsing==3.2.1
+      - qpsolvers==4.5.0
       - rich==13.9.4
       - rich-click==1.8.8
+      - scipy==1.15.2
+      - six==1.17.0
       - unitree-sdk2py==1.0.1
       - zipp==3.21.0
 prefix: /home/genisis/miniconda3/envs/goal_kicking
