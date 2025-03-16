@@ -4,10 +4,11 @@ from matplotlib import pyplot as plt
 
 def optimize_impulse(q_des, q_i, N=100, J_max=np.inf, dt=0.01, m=0.43) -> np.array:
     g = 9.81
+    N = N - 1 # go from 0th to Nth timestep -> N total 
+
     P = np.array([[(N/m * dt)**2, 0],
                   [0, (N/m * dt)**2]])
-    
-    q_T = (N * dt) / m * np.array([q_i[0] - q_des[0], q_i[1] - q_des[1] - (N - 1)* N * dt**2 * g / 2])
+    q_T = (N * dt) / m * np.array([q_i[0] - q_des[0], q_i[1] - q_des[1] - (N - 1) * N * dt**2 * g / 2])
     q = q_T.T
 
     G = np.array([[1, 0],
@@ -51,10 +52,24 @@ def visualize_contact(J, p_c, r=0.22, ball_center=np.array([0, 0.11])) -> None:
     plt.grid()
     plt.show()
 
-def dynamics_rollout(J, q_i): #TODO
-    pass
+def dynamics_rollout(J, q_des, q_i, N = 100, dt=0.01, m = 0.43) -> None:
+    v_i = J / m
+    x = np.zeros((N, 4))
+    g = np.array([0, 9.81])
+    x[0, :] = np.concatenate((q_i, v_i))
+    for k in range(1, N):
+        v_k = v_i - k * dt * g
+        q_k = q_i + k * J/m * dt - (k-1) * k * dt**2 * g / 2
+        x[k, :] = np.concatenate((q_k, v_k))
+    plt.plot(q_des[0], q_des[1], 'ro', label='Target')
+    plt.plot(x[:, 0], x[:, 1], label='Position (q)')
+    plt.xlabel('x(m)')
+    plt.ylabel('y(m)')
+    plt.legend()
+    plt.show()
 
 if __name__ == "__main__":
-    J = optimize_impulse([20, 0], [0, 0])
+    J = optimize_impulse([20, 3], [0, 0])
+    dynamics_rollout(J, [20, 3], [0, 0])
     p_c = get_contact_point(J)
     visualize_contact(J, p_c)
