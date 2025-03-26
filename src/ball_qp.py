@@ -70,6 +70,7 @@ def dynamics_rollout(J, q_des, q_i, N = 100, dt=0.01, m = 0.43) -> None:
 
 if __name__ == "__main__":
     J = optimize_impulse([20, 3], [0, 0])
+    print(J)
     dynamics_rollout(J, [20, 3], [0, 0])
     p_c = get_contact_point(J)
     visualize_contact(J, p_c)
