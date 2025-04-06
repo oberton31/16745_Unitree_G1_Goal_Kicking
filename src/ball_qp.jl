@@ -1,7 +1,7 @@
 using LinearAlgebra
 using OSQP
 using Plots
-using Colors
+using CairoMakie
 using SparseArrays
 function optimize_impulse(q_des, q_i; N=100, J_max=Inf, dt=0.01, m=0.43)
     g = 9.81  
@@ -33,26 +33,29 @@ end
 
 function visualize_contact(J, p_c; r=0.22, ball_center=[0.0, 0.11])
     norm_J = J ./ norm(J) .* r
-    plt = plot(ratio=:equal, legend=:topleft,
-               xlims=(ball_center[1]-2r, ball_center[1]+2r),
-               ylims=(ball_center[2]-2r, ball_center[2]+2r),
-               title="Ball Contact Point Visualization",
-               xlabel="X Position", ylabel="Z Position")
+
+     # Create figure and axis
+    fig = Figure(size = (800, 600))  # Use size instead of resolution
+    ax = Axis(fig[1, 1], limits=(ball_center[1] - 2 * r, ball_center[1] + 2 * r,ball_center[2] - 2 * r, ball_center[2] + 2 * r), title = "Ball Contact Point Visualization", xlabel = "X Position", ylabel = "Z Position")
     
-    # Draw ball
+    # Draw ball as a circle
     θ = LinRange(0, 2π, 100)
-    plot!(plt, ball_center[1] .+ r*cos.(θ), ball_center[2] .+ r*sin.(θ), 
-          color=:blue, linewidth=2, label="Ball")
+    ball_x = ball_center[1] .+ r * cos.(θ)
+    ball_y = ball_center[2] .+ r * sin.(θ)
+    lines!(ax, ball_x, ball_y, color=:blue, linewidth=2, label="Ball")
     
-    # Plot elements
-    scatter!(plt, [ball_center[1]], [ball_center[2]], 
-            color=:red, label="Ball Center")
-    scatter!(plt, [p_c[1]], [p_c[2]], 
-            marker=:x, color=:purple, label="Contact Point")
-    quiver!(plt, [p_c[1]], [p_c[2]], quiver=([norm_J[1]], [norm_J[2]]),
-           color=:green, label="Impulse Vector Direction")
+    # Plot elements (Contact Point, Ball Center, etc.)
+    CairoMakie.scatter!(ax, [p_c[1]], [p_c[2]], color=:purple, marker=:x, label="Contact Point")
+    CairoMakie.scatter!(ax, [ball_center[1]], [ball_center[2]], color=:red, label="Ball Center")
     
-    display(plt)
+    # Impulse vector (norm_J)
+    arrows!(ax, [p_c[1]], [p_c[2]], [norm_J[1]], [norm_J[2]], color=:green, label="Impulse Vector")
+    
+    fig[1, 2] = Legend(fig, ax, framevisible = false)
+
+    
+    # Show plot
+    display(fig)
 end
 
 function dynamics_rollout(J, q_des, q_i; N=100, dt=0.01, m=0.43)
@@ -69,10 +72,16 @@ function dynamics_rollout(J, q_des, q_i; N=100, dt=0.01, m=0.43)
         x[k, :] = [q_k; v_k]
     end
     @assert (norm(q_des .- x[end, 1:2], Inf)) < 1e-6
-    plt = plot(x[:, 1], x[:, 2], label="Position (q)")
-    scatter!(plt, [q_des[1]], [q_des[2]], 
-            color=:red, label="Target")
-    xlabel!("x(m)")
-    ylabel!("y(m)")
-    display(plt)
+    # Create a plot using CairoMakie
+    fig = Figure(size = (800, 600))
+    ax = Axis(fig[1, 1], title = "Dynamics Rollout", xlabel = "X (m)", ylabel = "Y (m)")
+
+    # Plot position trajectory using lines
+    lines!(ax, x[:, 1], x[:, 2], label="Position (q)")
+
+    # Add the target point
+    CairoMakie.scatter!(ax, [q_des[1]], [q_des[2]], color=:red, label="Target")
+
+    # Display the plot
+    display(fig)
 end
