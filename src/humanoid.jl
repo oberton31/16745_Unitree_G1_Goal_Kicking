@@ -14,12 +14,13 @@ parent_dir = dirname(current_dir)
 
 const URDFPATH = joinpath(parent_dir, "unitree_robots", "g1", "urdf", "g1_29dof.urdf")
 
-function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true) where T
+function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true, fixed::Bool=false) where T
     # Get the relevant bodies and joints
     left_ankle_body = findbody(mech, "left_ankle_pitch_link")  # Use the correct body name
     world_body = root_body(mech)  # The world frame is the root body
 
-    if !revolute
+    if !revolute && !fixed
+        println("here")
         # Create a spherical joint to allow free rotation
         ankle_joint = Joint("left_ankle_to_world", QuaternionSpherical{T}())
         joint_pose = Transform3D(
@@ -29,6 +30,14 @@ function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true) where T
         )
 
         # Attach the left ankle body to the world using this joint
+        attach!(mech, world_body, left_ankle_body, ankle_joint, joint_pose=joint_pose)
+    elseif fixed
+        ankle_joint = Joint("left_ankle_to_world", RigidBodyDynamics.Fixed{T}())
+        joint_pose = Transform3D(
+            frame_before(ankle_joint),
+            default_frame(world_body),
+            SVector(0., 0., 0.)
+        )
         attach!(mech, world_body, left_ankle_body, ankle_joint, joint_pose=joint_pose)
     else
         # Create revolute joints for X, Y, and Z axes
@@ -82,7 +91,7 @@ end
 
 function build_humanoid()
     g1 = parse_urdf(URDFPATH, floating=true, remove_fixed_tree_joints=false)
-    attach_left_ankle!(g1)
+    attach_left_ankle!(g1, revolute=true, fixed=false)
     return g1
 end
 
@@ -104,7 +113,7 @@ function G1Humanoid()
     G1Humanoid(build_humanoid())
 end
 
-state_dim(model::G1Humanoid) = 58  # 29 joints * 2 (position and velocity)
+state_dim(model::G1Humanoid) = 64  # 29 joints * 2 (position and velocity) + 3 DoF of foot rotation (3 pos and 3 vel)
 control_dim(model::G1Humanoid) = 29  # 29 actuated joints
 
 function get_partition(model::G1Humanoid)
@@ -130,8 +139,8 @@ function dynamics(model::G1Humanoid, x::AbstractVector{T1}, u::AbstractVector{T2
 end
 
 function jacobian(model::G1Humanoid, x, u)
-    ix = SVector{58}(1:58)
-    iu = SVector{29}(59:87)
+    ix = SVector{64}(1:64)
+    iu = SVector{29}(65:93)
     faug(z) = dynamics(model, z[ix], z[iu])
     z = [x; u]
     ForwardDiff.jacobian(faug, z)
