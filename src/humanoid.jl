@@ -16,9 +16,15 @@ const URDFPATH = joinpath(parent_dir, "unitree_robots", "g1", "urdf", "g1_29dof.
 
 function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true, fixed::Bool=false) where T
     # Get the relevant bodies and joints
-    left_ankle_body = findbody(mech, "left_ankle_pitch_link")  # Use the correct body name
+    left_ankle_body = findbody(mech, "left_ankle_roll_link")  # Use the correct body name
     world_body = root_body(mech)  # The world frame is the root body
+    state = MechanismState(mech)
 
+    world_to_ankle = RigidBodyDynamics.translation(relative_transform(state, default_frame(world_body), default_frame(left_ankle_body)))
+    body_z_offset = 0 #-0.01755
+    foot_bottom_offset = -0.03
+    left_ankle_location = SA[world_to_ankle[1], world_to_ankle[2], body_z_offset + foot_bottom_offset]
+    
     if !revolute && !fixed
         println("here")
         # Create a spherical joint to allow free rotation
@@ -26,7 +32,7 @@ function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true, fixed::Bool
         joint_pose = Transform3D(
             frame_before(ankle_joint),
             default_frame(world_body),
-            SVector(0., 0., 0.)  # Position at origin of world frame
+            -left_ankle_location  # Position at origin of world frame
         )
 
         # Attach the left ankle body to the world using this joint
@@ -36,7 +42,7 @@ function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true, fixed::Bool
         joint_pose = Transform3D(
             frame_before(ankle_joint),
             default_frame(world_body),
-            SVector(0., 0., 0.)
+            -left_ankle_location
         )
         attach!(mech, world_body, left_ankle_body, ankle_joint, joint_pose=joint_pose)
     else
@@ -59,7 +65,7 @@ function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true, fixed::Bool
         joint_pose_x = Transform3D(
             frame_before(ankle_joint_x),
             default_frame(world_body),
-            SVector(0., 0., 0.)
+            -left_ankle_location
         )
         attach!(mech, world_body, dummy1, ankle_joint_x, joint_pose=joint_pose_x)
 
