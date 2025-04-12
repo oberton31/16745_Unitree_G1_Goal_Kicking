@@ -8,6 +8,7 @@ using Rotations
 using LinearAlgebra
 using ForwardDiff
 using Quaternions
+using CoordinateTransformations
 
 current_dir = abspath(@__DIR__)
 parent_dir = dirname(current_dir)
@@ -17,13 +18,14 @@ const URDFPATH = joinpath(parent_dir, "unitree_robots", "g1", "urdf", "g1_29dof.
 function attach_left_ankle!(mech::Mechanism{T}; revolute::Bool=true, fixed::Bool=false) where T
     # Get the relevant bodies and joints
     left_ankle_body = findbody(mech, "left_ankle_roll_link")  # Use the correct body name
-    world_body = root_body(mech)  # The world frame is the root body
+    world_body = findbody(mech, "world")
+    trunk = findbody(mech, "pelvis")  # The world frame is the root body
     state = MechanismState(mech)
 
-    world_to_ankle = RigidBodyDynamics.translation(relative_transform(state, default_frame(world_body), default_frame(left_ankle_body)))
-    body_z_offset = 0 #-0.01755
+    trunk_to_ankle = RigidBodyDynamics.translation(relative_transform(state, default_frame(trunk), default_frame(left_ankle_body)))
+    #body_z_offset = 0 #-0.01755
     foot_bottom_offset = -0.03
-    left_ankle_location = SA[world_to_ankle[1], world_to_ankle[2], body_z_offset + foot_bottom_offset]
+    left_ankle_location = SA[trunk_to_ankle[1], trunk_to_ankle[2], foot_bottom_offset]
     
     if !revolute && !fixed
         println("here")
@@ -249,4 +251,26 @@ function initialize_visualizer(g1::G1Humanoid)
     mvis = MechanismVisualizer(g1.mech, URDFVisuals(URDFPATH), vis)
     cd(@__DIR__)
     return mvis
+end
+
+
+function get_right_foot_tip_location(mech::Mechanism{T},x::AbstractVector{T}) where T
+    state = MechanismState(mech)
+    copyto!(state, x)
+    
+    # Get the right ankle roll link body
+    right_ankle_body = findbody(mech, "right_ankle_roll_link")
+    world_body = findbody(mech, "world")
+
+    # Get the transformation from the world frame to the right ankle body
+    right_ankle_to_world = relative_transform(state, default_frame(right_ankle_body), default_frame(world_body))
+    foot_tip_offset = Transform3D(
+        default_frame(right_ankle_body), 
+        default_frame(right_ankle_body),
+        RotMatrix3(one(SMatrix{3,3,T})),
+        SVector(0.14, 0.0, -0.03)
+    )
+    foot_tip_in_world = right_ankle_to_world * foot_tip_offset
+    return RigidBodyDynamics.translation(foot_tip_in_world)
+    return right_ankle_to_world
 end
