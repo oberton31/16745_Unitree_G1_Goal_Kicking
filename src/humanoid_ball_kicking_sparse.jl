@@ -122,21 +122,18 @@ function foot_position_constraint(traj_indices::NamedTuple, mech::Mechanism, bal
    jacobian!(params::NamedTuple, z::Vector, conjac::AbstractMatrix) = begin
         state = MechanismState(mech)
         copyto!(state, z[xi])
-        
-        # Get foot body and compute Jacobian
         foot_jacobian = geometric_jacobian(state, kinematic_path)
         
-        # Extract translation components (3 × nq matrix)
-        J_trans = Matrix(foot_jacobian)[1:3, :]
-        nq = size(J_trans, 2)  # Number of joint positions
+        # Extract translation components
+        J_trans = Matrix(foot_jacobian)[4:6, :]
+        nq = size(J_trans, 2)
         
         # Ensure xi spans the correct columns for joint positions
         if length(xi) < nq
             error("xi must span at least $nq columns (joint positions) but has length $(length(xi))")
         end
         
-        # Assign Jacobian to the FIRST nq columns of xi
-        conjac[1:3, xi[1:nq]] .= J_trans
+        conjac[:, xi[1:nq]] .= J_trans
     end
     
     
