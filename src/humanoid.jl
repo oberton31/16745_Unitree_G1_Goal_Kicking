@@ -254,8 +254,8 @@ function initialize_visualizer(g1::G1Humanoid)
 end
 
 
-function get_right_foot_tip_location(mech::Mechanism{T},x::AbstractVector{T}) where T
-    state = MechanismState(mech)
+function get_right_foot_tip_location(mech::Mechanism{T1}, x::AbstractVector{T2}) where {T1, T2<:Real}
+    state = MechanismState{T2}(mech)
     copyto!(state, x)
     
     # Get the right ankle roll link body
@@ -267,10 +267,9 @@ function get_right_foot_tip_location(mech::Mechanism{T},x::AbstractVector{T}) wh
     foot_tip_offset = Transform3D(
         default_frame(right_ankle_body), 
         default_frame(right_ankle_body),
-        RotMatrix3(one(SMatrix{3,3,T})),
-        SVector(0.14, 0.0, -0.03)
+        RotMatrix3(one(SMatrix{3,3,T2})),
+        SVector{3,T2}(0.14, 0.0, -0.03)
     )
     foot_tip_in_world = right_ankle_to_world * foot_tip_offset
     return RigidBodyDynamics.translation(foot_tip_in_world)
-    return right_ankle_to_world
 end
