@@ -36,13 +36,14 @@ function quadratic_cost(traj_indices::NamedTuple, k::Int64, Q::Matrix{Float64}, 
     # TODO: Tune this cost function -> add costs related to foot position
     function cost_func(params::NamedTuple, z::Vector)
         x = z[xi]
-        foot_tip_pos = get_right_foot_tip_location(params.model.mech, x)
+        #foot_tip_pos = get_right_foot_tip_location(params.model.mech, x)
         # 0.5*(x - x_g)'*Q2*(x-x_g)
-        foot_pos_cost = 0
-        if (foot_tip_pos[2]) > 0
-            foot_pos_cost = 1000
-        end
-        return 0.5*(x[1:32] - x_g[1:32])'*Q*(x[1:32] - x_g[1:32]) + 0.5 * z[ui]'*R*z[ui] + foot_pos_cost
+        #foot_pos_cost = 0
+        # if (foot_tip_pos[2]) > 0
+        #     foot_pos_cost = 1000
+        # end
+        return 0.5*(x[1:32] - x_g[1:32])'*Q*(x[1:32] - x_g[1:32]) + 0.5 * z[ui]'*R*z[ui] #+ foot_pos_cost
+
     end
     function cost_grad!(params::NamedTuple, z::Vector{Float64}, grad::Vector{Float64})
         grad .+= FD.gradient(z_ -> cost_func(params, z_), z)
@@ -54,6 +55,8 @@ function final_cost(traj_indices::NamedTuple, N::Int64, Qf::Matrix{Float64}, x_g
     xi = traj_indices.x[N]
     # TODO: Tune this cost function
     cost_func(params::NamedTuple, z::Vector) = 0.5*((z[xi][1:32] - x_g[1:32])'*Qf*(z[xi][1:32] - x_g[1:32]))
+    # cost_func(params::NamedTuple, z::Vector) = 0.5*((z[xi] - x_g)'*Qf*(z[xi] - x_g))
+
     function cost_grad!(params::NamedTuple, z::Vector{Float64}, grad::Vector{Float64})
         grad .+= FD.gradient(z_ -> cost_func(params, z_), z)
     end
@@ -103,103 +106,63 @@ function goal_constraint(traj_indices::NamedTuple, x_g::Vector{Float64}, N)
     nx = 64
     nq = 32
     residual(params::NamedTuple, z::Vector, con::AbstractVector) = con .= z[x_N][1:32] - x_g[1:32]
+    # residual(params::NamedTuple, z::Vector, con::AbstractVector) = con .= z[x_N] - x_g
+
     jacobian!(params::NamedTuple, z::Vector, conjac::AbstractMatrix) = conjac[:, x_N[1:32]] = I(length(x_N[1:32]))
+    # jacobian!(params::NamedTuple, z::Vector, conjac::AbstractMatrix) = conjac[:, x_N] = I(length(x_N))
+
     sparsity!(conjac::AbstractMatrix) = conjac[:, x_N[1:32]] .= 1
+    # sparsity!(conjac::AbstractMatrix) = conjac[:, x_N] .= 1
+
     bounds = (zeros(nq), zeros(nq))
+    # bounds = (zeros(nx), zeros(nx))
+
     return (length=nq, residual=residual, jacobian=jacobian!, sparsity=sparsity!, bounds=bounds)
 end
 
-# function foot_position_constraint(traj_indices::NamedTuple, mech::Mechanism, ball_pos::AbstractVector, k::Int)
-#     xi = traj_indices.x[k]
-#     foot_body = findbody(model.mech, "right_ankle_roll_link")
-#     world_body = findbody(model.mech, "world")
-#     kinematic_path = path(model.mech, foot_body, world_body)
-#     residual(params::NamedTuple, z::Vector, con::AbstractVector) = begin
-#         state = MechanismState(mech)
-#         copyto!(state, z[xi])  # Set mechanism state
-#         foot_tip_pos = get_right_foot_tip_location(mech, z[xi])
-#         con .= foot_tip_pos - ball_pos
-#     end
+# TODO: generate foot velocity constraint
 
-#    jacobian!(params::NamedTuple, z::Vector, conjac::AbstractMatrix) = begin
-#         state = MechanismState(mech)
-#         copyto!(state, z[xi])
-#         foot_jacobian = geometric_jacobian(state, kinematic_path)
-        
-#         # Extract translation components
-#         J_trans = Matrix(foot_jacobian)[4:6, :]
-#         nq = size(J_trans, 2)
-        
-#         # Ensure xi spans the correct columns for joint positions
-#         if length(xi) < nq
-#             error("xi must span at least $nq columns (joint positions) but has length $(length(xi))")
-#         end
-        
-#         conjac[:, xi[1:nq]] .= J_trans
-#     end
+
+function foot_velocity_constraint(traj_indices::NamedTuple, mech::Mechanism, v_des, N)
+    xi = traj_indices.x[N]
+    foot_body = findbody(model.mech, "right_ankle_roll_link")
+    world_body = findbody(model.mech, "world")
+    kinematic_path = path(model.mech, foot_body, world_body)
+    state = MechanismState(mech)
+
+    residual(params::NamedTuple, z::Vector, con::AbstractVector) = begin
+        copyto!(state, z[xi])
+        Jg = geometric_jacobian(state, kinematic_path) # geometric jacobian tells you how each joint will effect angular and translational velocity
+        # analytical jacobian is similar, but helps you find the change in your chosen parameter mapping
+        J = Matrix(Jg)[1:3, :]
+        # J(q) * dq = v
+        dq = z[xi[33:64]]
+
+        con .= J*dq - v_des
+    end
+
+   jacobian!(params::NamedTuple, z::Vector, conjac::AbstractMatrix) = begin
+        state = MechanismState(mech)
+        copyto!(state, z[xi])
+        Jg = geometric_jacobian(state, kinematic_path)
+        # Approximate hessian with jacobian, instead of finding jacobian of J * dq
+        J = Matrix(Jg)[1:3, :]
+
+        conjac[:, xi[33:64]] .= J
+    end
     
     
-#     sparsity!(conjac::AbstractMatrix) = conjac[:, xi] .= 1
-#     bounds = (zeros(3), zeros(3))
+    sparsity!(conjac::AbstractMatrix) = conjac[:, xi[33:64]] .= 1
+    bounds = (zeros(3), zeros(3))
     
-#     return (length=3, residual=residual, jacobian=jacobian!, sparsity=sparsity!, bounds=bounds)
-# end
+    return (length=3, residual=residual, jacobian=jacobian!, sparsity=sparsity!, bounds=bounds)
+end
 
-
-# function generate_kick_arc_trajectory(
-#     start_pos::Vector{Float64},
-#     end_pos::Vector{Float64},
-#     arc_dip::Float64,
-#     arc_rise::Float64,
-#     max_step_norm::Float64;
-#     max_points::Int = 500,
-#     scale_dip_if_needed::Bool = true
-# )
-#     num_points = 2
-#     orig_dip = arc_dip  # Save original for scaling logic
-
-#     function create_kick_arc(n, dip)
-#         arc_traj = Vector{SVector{3, Float64}}()
-#         for i in range(0, 1, length=n)
-#             pos = (1 - i) * start_pos .+ i * end_pos
-
-#             if i < 0.5
-#                 z_mod = -4 * dip * i * (1 - i)
-#             else
-#                 z_mod = 2 * arc_rise * (i - 0.5)^2
-#             end
-
-#             pos[3] += z_mod
-#             push!(arc_traj, SVector{3}(pos))
-#         end
-#         return arc_traj
-#     end
-
-#     while num_points <= max_points
-#         arc = create_kick_arc(num_points, arc_dip)
-#         max_dist = maximum(norm(arc[i+1] - arc[i]) for i in 1:length(arc)-1)
-
-#         if max_dist < max_step_norm
-#             return arc
-#         end
-
-#         # Optional: adaptive dip scaling
-#         if scale_dip_if_needed && num_points == max_points
-#             arc_dip *= 0.95  # reduce dip a bit
-#             num_points = 2   # restart with fewer points
-#             #@info "Reducing dip to $(round(arc_dip, digits=4)) to meet step constraint."
-#         else
-#             num_points += 1
-#         end
-#     end
-
-#     error("Could not satisfy step constraint after $max_points points. Final dip = $(round(arc_dip, digits=4))")
-# end
 
 function optimize_trajectory_sparse(nx, nu, dt, N, x_eq, u_eq, equilib_foot_pos, kick_foot_pos, model, lower_foot_limits, upper_foot_limits, x_guess, u_guess, x_g)
     nq = 32
     Q = diagm(1e0*ones(nq)) # only care about position, not velocity
-    R = diagm(1e-2*ones(nu))
+    R = diagm(1e-4*ones(nu))
     Qf = diagm(1e3*ones(nq))
     x_ic = 1 * x_eq
     x_ic[1:3] .= 0
@@ -208,13 +171,6 @@ function optimize_trajectory_sparse(nx, nu, dt, N, x_eq, u_eq, equilib_foot_pos,
         x = rand(nx, N),
         u = rand(nu, N),
     )
-    # foot_ref = vcat([
-    #     (1 - t) * equilib_foot_pos + t * kick_foot_pos for t in range(0, stop=1, length=div(N, 2))
-    # ],
-    # [
-    #     (1 - t) * kick_foot_pos + t * equilib_foot_pos for t in range(0, stop=1, length=div(N, 2))
-    # ])
-    # #foot_pos = foot_equilib_pos .+ 0.1 * rand(3)
 
     z0 = vcat(
         [vcat(x_guess[i], u_guess[i]) for i in 1:N]...
@@ -227,23 +183,19 @@ function optimize_trajectory_sparse(nx, nu, dt, N, x_eq, u_eq, equilib_foot_pos,
         final_cost(traj_indices, N, Qf, x_g)
     )
 
+    v_des = [1.0, 0, 0]
     # TODO: expirement with constraints to limit the wiggle of the foot
-    con_objs = Vector{NamedTuple}([ic_constraint(traj_indices, x_ic), goal_constraint(traj_indices, x_g, N), [dyn_constraint(traj_indices, k) for k = 1:N-1]...])
+    con_objs = Vector{NamedTuple}([foot_velocity_constraint(traj_indices, model.mech, v_des, N), ic_constraint(traj_indices, x_ic), goal_constraint(traj_indices, x_g, N), [dyn_constraint(traj_indices, k) for k = 1:N-1]...])
     nc, conjac = setup_constraints(traj, con_objs)
 
-    # u_scale is used to normalize u to be closer to 1 (allowing for faster optimization)
     param = (costs = cost_objs, constraints = con_objs, nconstraints=nc, nz=length(traj.datavec), model=model, dt=dt)
     @assert nc < length(traj.datavec)
     # Constrain bounds (equality and inequality)
     c_l, c_u = constraint_bounds(param)
 
 
-    # Intial_guess
-    #z0 = randn(param.nz) * 0.01
-    #z0 = vcat([[x_eq; u_eq] for _ in 1:N]...) # warm start
-
     # primal bounds
-    z_l, z_u = fill(-200.0, param.nz), fill(200.0, param.nz)
+    z_l, z_u = fill(-120.0, param.nz), fill(120.0, param.nz)
 
     # bound foot rotation to be zero
     for k = 1:N
@@ -251,8 +203,8 @@ function optimize_trajectory_sparse(nx, nu, dt, N, x_eq, u_eq, equilib_foot_pos,
         ui = traj_indices.u[k]
         z_l[xi[1:3]] .= 0
         z_u[xi[1:3]] .= 0
-        # z_l[xi[4:32]] .= 2 .* lower_foot_limits # TODO: these joint limits seem to be the limiting constraints
-        z_u[xi[4:32]] .= 1 .* upper_foot_limits
+        # z_l[xi[4:32]] .= 3 .* lower_foot_limits # TODO: these joint limits seem to be the limiting constraints
+        z_u[xi[4:32]] .= 2 .* upper_foot_limits
         z_l[xi[36:64]] .= -15
         z_u[xi[36:64]] .= 15
     end
@@ -268,8 +220,8 @@ function optimize_trajectory_sparse(nx, nu, dt, N, x_eq, u_eq, equilib_foot_pos,
                                 c_u,
                                 z0,
                                 param,
-                                tol = 1e-1, # for testing purposes
-                                c_tol = 1e-1, # for testing purposes
+                                tol = 1e-3, # for testing purposes
+                                c_tol = 1e-3, # for testing purposes
                                 max_iters = 15000,
                                 print_level = 5); # for testing purposes
     traj.datavec .= z
@@ -594,7 +546,7 @@ function main()
     guess_loaded = load("guess.jld2")
     x_guess = guess_loaded["x"]
 
-    lower_limits = [
+    lower_limits = [ # make sure these are correct
         -2.5307, -0.5236, -2.7576, -0.087267, -0.87267, -0.2618,
         -2.5307, -2.9671, -2.7576, -0.087267, -0.87267, -0.2618,
         -2.618, -0.52, -0.52,
