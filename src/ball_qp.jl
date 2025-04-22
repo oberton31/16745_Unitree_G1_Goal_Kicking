@@ -25,13 +25,13 @@ function optimize_impulse(q_des, q_i; N=100, J_max=Inf, dt=0.01, m=0.43)
     return res.x
 end
 
-function get_contact_point(J, r=0.22, ball_center=[0.0, 0.11])
+function get_contact_point(J, r=0.11, ball_center=[0.0, 0.11])
     norm_J = J ./ norm(J)
     p_c = ball_center .- norm_J .* r
     return p_c
 end
 
-function visualize_contact(J, p_c; r=0.22, ball_center=[0.0, 0.11])
+function visualize_contact(J, p_c; r=0.11, ball_center=[0.0, 0.11])
     norm_J = J ./ norm(J) .* r
 
      # Create figure and axis
