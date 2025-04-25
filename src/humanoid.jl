@@ -99,7 +99,7 @@ end
 
 function build_humanoid()
     g1 = parse_urdf(URDFPATH, floating=true, remove_fixed_tree_joints=false)
-    attach_left_ankle!(g1, revolute=true, fixed=false)
+    attach_left_ankle!(g1, revolute=true, fixed=true)
     return g1
 end
 
@@ -121,7 +121,7 @@ function G1Humanoid()
     G1Humanoid(build_humanoid())
 end
 
-state_dim(model::G1Humanoid) = 64  # 29 joints * 2 (position and velocity) + 3 DoF of foot rotation (3 pos and 3 vel)
+state_dim(model::G1Humanoid) = 58  # 29 joints * 2 (position and velocity)
 control_dim(model::G1Humanoid) = 29  # 29 actuated joints
 
 function get_partition(model::G1Humanoid)
@@ -139,7 +139,7 @@ function dynamics(model::G1Humanoid, x::AbstractVector{T1}, u::AbstractVector{T2
     
     # Assuming the first 6 DoFs are for the floating base (unactuated)
     # and the rest are actuated joints
-    τ[4:end] = u    
+    τ = 1 * u    
     dynamics!(res, state, τ)
     q̇ = res.q̇
     v̇ = res.v̇
@@ -237,9 +237,9 @@ function initial_state(model::G1Humanoid)
     #set_joint_configuration!(state, g1, "d435_joint", 0)
     #set_joint_configuration!(state, g1, "mid360_joint", 0)
     #set_joint_configuration!(state, g1, "waist_support_joint", 0)
-    set_configuration!(state, findjoint(g1, "left_ankle_joint_x"), deg2rad(00))
-    set_configuration!(state, findjoint(g1, "left_ankle_joint_y"), deg2rad(-00))
-    set_configuration!(state, findjoint(g1, "left_ankle_joint_z"), deg2rad(-00))
+    # set_configuration!(state, findjoint(g1, "left_ankle_joint_x"), deg2rad(00))
+    # set_configuration!(state, findjoint(g1, "left_ankle_joint_y"), deg2rad(-00))
+    # set_configuration!(state, findjoint(g1, "left_ankle_joint_z"), deg2rad(-00))
 
     return [configuration(state); velocity(state)]
 end
