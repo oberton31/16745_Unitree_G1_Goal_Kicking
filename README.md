@@ -1,8 +1,8 @@
 # Unitree G1 Humanoid ball Kicking
 
-This project was completed as part of the Optimal Control and Reinforcement Learning Course at Carnegie Mellon University. \\
-We used direct collocation to generate an optimal trajectory for a Unitree G1 Humanoid to kick a ball at a target, and \\
-used inifinte-horizon and time-varying LQR to balance the robot and track the desired kicking trajectory. Note that there \\
+This project was completed as part of the Optimal Control and Reinforcement Learning Course at Carnegie Mellon University. \
+We used direct collocation to generate an optimal trajectory for a Unitree G1 Humanoid to kick a ball at a target, and \
+used inifinte-horizon and time-varying LQR to balance the robot and track the desired kicking trajectory. Note that there \
 is an initial balancing period prior to the kicking motion.
 
 ![Alt text](images/kicking_1.png)
